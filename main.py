@@ -4,6 +4,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from tkinter import messagebox
+from tkinter import simpledialog
 from tkinter import *
 import tkinter as tk
 import time
@@ -11,6 +12,8 @@ import os
 
 realPath = os.path.dirname(__file__)
 slp = 5
+window = tk.Tk()
+
 
 class linkManager:
     def __init__(self):
@@ -79,7 +82,7 @@ class algorithm:
         btnlogin.click()
 
         # username
-        txtLogin = WebDriverWait(self.driver, 10).until(
+        txtLogin = WebDriverWait(self.driver, 30).until(
             ec.visibility_of_element_located((By.XPATH, self.linkManager.loginInput_xpath)))
         txtLogin.send_keys(masterLogin)
 
@@ -101,8 +104,6 @@ class algorithm:
         pass
 
     def clientLogin(self, cLogin, cPasswd):
-        
-
         cPasswd = cPasswd.strip("\n")
 
         try:
@@ -137,8 +138,9 @@ class algorithm:
         btnLogin.click()
     #Master & Client login [END]
 
+    #####################################################################################
     #Collect data from master account [Start]
-    def getPendingBets(self):
+    def getPendingBets(self, ticket_No):
         bets = []
         # navigate to bets table
         try:
@@ -151,17 +153,22 @@ class algorithm:
         element = WebDriverWait(self.driver, 10).until(ec.visibility_of_element_located(
             (By.XPATH, self.linkManager.recentBetsTableBody_xpath)))
 
+        #Bet slips [table rows]
         for el in element.find_elements(By.TAG_NAME, "tr"):
             el.click()
 
             slip_table = WebDriverWait(element, 30).until(
                 ec.visibility_of_element_located((By.CLASS_NAME, "transaction-details")))
 
+            #[table columns]
             for row in slip_table.find_elements(By.TAG_NAME, "tr"):
                 if row.get_attribute("class") == "p-20 bg-warning":
                     continue
                 
                 elif "Paid Out" in el.find_elements(By.TAG_NAME, "td")[7].text or "Losing" in el.find_elements(By.TAG_NAME, "td")[7].text:
+                    continue
+
+                elif ticket_No not in el.find_elements(By.TAG_NAME, "td")[2].text:
                     continue
 
                 else:
@@ -193,7 +200,7 @@ class algorithm:
         return str(int(intStake))
 
     #Login to client & place master's bets [Start]
-    def placeBets(self, bets, clientLogin, clientPassword):
+    def placeBets(self, bets, clientLogin, clientPassword, stake):
         prevTicket = ""
         
         self.clientLogin(clientLogin, clientPassword)
@@ -201,12 +208,13 @@ class algorithm:
         #For each and every ticket
         for bet in bets:
             ticket_no, stake, betDetails = bet
+            stake = stake
 
             try:
                 stake = self.stakeCompare(stake)
             except:
                 time.sleep(1)
-                self.placeBets(bets,clientLogin, clientPassword)
+                self.placeBets(bets,clientLogin, clientPassword, stake)
 
             self.driver.get("https://m.hollywoodbets.net/Menu/Betting/SportNew.aspx#Countries?sportId=1&sportName=Soccer")
 
@@ -247,6 +255,7 @@ class algorithm:
             for _country in Countryparent.find_elements(By.TAG_NAME, "li"):
                 self.driver.execute_script("arguments[0].scrollIntoView();", _country)
                 if country in _country.text:
+                    time.sleep(0.5)
                     _country.find_elements(By.TAG_NAME, "div")[0].click()
                     leagueParent = WebDriverWait(self.driver, 30).until(ec.visibility_of_element_located(
                         (By.XPATH, "/html/body/form/main/div[1]/div[3]/div[3]/div[3]/ul")))
@@ -336,7 +345,11 @@ class algorithm:
 ######################################################################
 def startBetting(self):
     #start copy bet algorithm
+    ticket_No = ""
     try:
+        ticket_No = simpledialog.askstring("Ticket_Number", "Enter Ticket Number:", parent=window)
+        stake = simpledialog.askstring("Stake_Amount", "Clients' Bet Stake:", parent=window)
+        
         main = algorithm()
         credentials = credentialManager()
     except Exception as e:
@@ -346,7 +359,7 @@ def startBetting(self):
     try:
         username, passwd = credentials.credMaster()
         main.login(username, passwd)
-        bets = main.getPendingBets()
+        bets = main.getPendingBets(ticket_No)
     except Exception as e:
         messagebox.showerror("Failed to login to/collect master account bets", e.message)
 
@@ -359,7 +372,7 @@ def startBetting(self):
     #login and bet per client
     for client in credentials.credClients():
         cLog, cPsw = client
-        main.placeBets(bets, cLog, cPsw)
+        main.placeBets(bets, cLog, cPsw, stake)
 
     main.driver.quit()
 
@@ -380,31 +393,29 @@ def editClientDetails(self):
     except:
         os.system("gedit " + realPath + "/clients.dat")
 
-#window = tk.Tk()
-#window.geometry("400x200")
+#window initiated @ top
+window.geometry("400x200")
 
-#intro = tk.Label(text="Soccer Betting Automation")
-#intro.pack()
+intro = tk.Label(text="Soccer Betting Automation")
+intro.pack()
 
-#btnHolder = tk.Frame(window)
+btnHolder = tk.Frame(window)
 
-#editMaster = tk.Button(btnHolder, text="Edit Master's details")
-#editMaster.pack()
+editMaster = tk.Button(btnHolder, text="Edit Master's details")
+editMaster.pack()
 
-#editClients = tk.Button(btnHolder, text="Edit Client details")
-#editClients.pack()
+editClients = tk.Button(btnHolder, text="Edit Client details")
+editClients.pack()
 
-#btnStartCopyBet = tk.Button(btnHolder, text="Start Copy Betting")
-#btnStartCopyBet.pack()
+btnStartCopyBet = tk.Button(btnHolder, text="Start Copy Betting")
+btnStartCopyBet.pack()
 
-#btnHolder.pack(side = BOTTOM)
+btnHolder.pack(side = BOTTOM)
 
-#editMaster.bind("<Button-1>", editMasterDetails)
-#editClients.bind("<Button-1>", editClientDetails)
-#btnStartCopyBet.bind("<Button-1>", startBetting)
+editMaster.bind("<Button-1>", editMasterDetails)
+editClients.bind("<Button-1>", editClientDetails)
+btnStartCopyBet.bind("<Button-1>", startBetting)
 
-#window.mainloop()
+window.mainloop()
 
 #print(realPath)
-
-startBetting(0)
